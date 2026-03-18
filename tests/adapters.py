@@ -33,7 +33,7 @@ def run_linear(
     """
     linear = cs336_basics.transformer.Linear(d_in, d_out)
     linear.weights.data = weights
-    return linear.forward(in_features)
+    return linear(in_features)
 
 
 def run_embedding(
@@ -56,7 +56,7 @@ def run_embedding(
     """
     embedding = cs336_basics.transformer.Embedding(vocab_size, d_model)
     embedding.weights.data = weights
-    return embedding.forward(token_ids)
+    return embedding(token_ids)
 
 
 def run_swiglu(
@@ -92,7 +92,7 @@ def run_swiglu(
     swiglu.w1.data = w1_weight
     swiglu.w2.data = w2_weight
     swiglu.w3.data = w3_weight
-    return swiglu.forward(in_features)
+    return swiglu(in_features)
 
 
 def run_scaled_dot_product_attention(
@@ -152,7 +152,7 @@ def run_multihead_self_attention(
     causal_MHA.w_k.data = k_proj_weight
     causal_MHA.w_v.data = v_proj_weight
     causal_MHA.w_o.data = o_proj_weight
-    return causal_MHA.forward(in_features)
+    return causal_MHA(in_features)
 
 
 def run_multihead_self_attention_with_rope(
@@ -197,7 +197,7 @@ def run_multihead_self_attention_with_rope(
     causal_MHA.w_k.data = k_proj_weight
     causal_MHA.w_v.data = v_proj_weight
     causal_MHA.w_o.data = o_proj_weight
-    return causal_MHA.forward(in_features, token_positions)
+    return causal_MHA(in_features, token_positions)
 
 def run_rope(
     d_k: int,
@@ -219,7 +219,7 @@ def run_rope(
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
     rope = cs336_basics.transformer.RotaryPositionalEmbedding(theta, d_k, max_seq_len)
-    return rope.forward(in_query_or_key, token_positions)
+    return rope(in_query_or_key, token_positions)
 
 
 def run_transformer_block(
@@ -292,7 +292,17 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
+    transformer_block = cs336_basics.transformer.TransformerBlock(d_model, num_heads, d_ff, theta, max_seq_len)
+    transformer_block.attn.w_q.data = weights['attn.q_proj.weight']
+    transformer_block.attn.w_k.data = weights['attn.k_proj.weight']
+    transformer_block.attn.w_v.data = weights['attn.v_proj.weight']
+    transformer_block.attn.w_o.data = weights['attn.output_proj.weight']
+    transformer_block.ln1.weights.data = weights['ln1.weight']
+    transformer_block.ffn.w1.data = weights['ffn.w1.weight']
+    transformer_block.ffn.w2.data = weights['ffn.w2.weight']
+    transformer_block.ffn.w3.data = weights['ffn.w3.weight']
+    transformer_block.ln2.weights.data = weights['ln2.weight']
+    return transformer_block(in_features)
 
 
 def run_transformer_lm(
@@ -374,7 +384,21 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    transformer = cs336_basics.transformer.Transformer(vocab_size, context_length, d_model, num_layers, num_heads, d_ff, rope_theta)
+    transformer.embedding.weights.data = weights['token_embeddings.weight']
+    for i in range(num_layers):
+        transformer.attn_layers[i].attn.w_q.data = weights['layers.{}.attn.q_proj.weight'.format(i)]
+        transformer.attn_layers[i].attn.w_k.data = weights['layers.{}.attn.k_proj.weight'.format(i)]
+        transformer.attn_layers[i].attn.w_v.data = weights['layers.{}.attn.v_proj.weight'.format(i)]
+        transformer.attn_layers[i].attn.w_o.data = weights['layers.{}.attn.output_proj.weight'.format(i)]
+        transformer.attn_layers[i].ln1.weights.data = weights['layers.{}.ln1.weight'.format(i)]
+        transformer.attn_layers[i].ffn.w1.data = weights['layers.{}.ffn.w1.weight'.format(i)]
+        transformer.attn_layers[i].ffn.w2.data = weights['layers.{}.ffn.w2.weight'.format(i)]
+        transformer.attn_layers[i].ffn.w3.data = weights['layers.{}.ffn.w3.weight'.format(i)]
+        transformer.attn_layers[i].ln2.weights.data = weights['layers.{}.ln2.weight'.format(i)]
+    transformer.ln.weights.data = weights['ln_final.weight']
+    transformer.out.weights.data = weights['lm_head.weight']
+    return transformer(in_indices)
 
 
 def run_rmsnorm(
@@ -399,7 +423,7 @@ def run_rmsnorm(
     """
     rms_norm = cs336_basics.transformer.RMSNorm(d_model, eps)
     rms_norm.weights.data = weights
-    return rms_norm.forward(in_features)
+    return rms_norm(in_features)
 
 
 def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
