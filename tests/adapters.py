@@ -11,7 +11,11 @@ from torch import Tensor
 
 import cs336_basics.train_bpe
 import cs336_basics.tokenizer
+import cs336_basics.nn_utils
 import cs336_basics.transformer
+import cs336_basics.optimizer
+import cs336_basics.train
+import cs336_basics.decode
 
 def run_linear(
     d_in: int,
@@ -460,7 +464,10 @@ def run_get_batch(
         is the sampled input sequences, and the second tuple item is the corresponding
         language modeling labels.
     """
-    raise NotImplementedError
+    return cs336_basics.train.get_batch(dataset=dataset,
+                                        batch_size=batch_size,
+                                        context_length=context_length,
+                                        device=device)
 
 
 def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
@@ -476,7 +483,7 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
         Float[Tensor, "..."]: Tensor of with the same shape as `in_features` with the output of
         softmax normalizing the specified `dim`.
     """
-    return cs336_basics.transformer.softmax(in_features, dim)
+    return cs336_basics.nn_utils.softmax(in_features, dim)
 
 
 def run_cross_entropy(
@@ -494,7 +501,7 @@ def run_cross_entropy(
     Returns:
         Float[Tensor, ""]: The average cross-entropy loss across examples.
     """
-    raise NotImplementedError
+    return cs336_basics.nn_utils.cross_entropy(inputs, targets)
 
 
 def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float) -> None:
@@ -506,14 +513,14 @@ def run_gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm:
 
     The gradients of the parameters (parameter.grad) should be modified in-place.
     """
-    raise NotImplementedError
+    cs336_basics.nn_utils.gradient_clipping(parameters, max_l2_norm)
 
 
 def get_adamw_cls() -> Any:
     """
     Returns a torch.optim.Optimizer that implements AdamW.
     """
-    raise NotImplementedError
+    return cs336_basics.optimizer.AdamW
 
 
 def run_get_lr_cosine_schedule(
@@ -541,8 +548,11 @@ def run_get_lr_cosine_schedule(
     Returns:
         Learning rate at the given iteration under the specified schedule.
     """
-    raise NotImplementedError
-
+    return cs336_basics.optimizer.get_lr_cosine_schedule(it=it,
+                                                         max_lr=max_learning_rate,
+                                                         min_lr=min_learning_rate,
+                                                         warmup_iters=warmup_iters,
+                                                         cosine_cycle_iters=cosine_cycle_iters)
 
 def run_save_checkpoint(
     model: torch.nn.Module,
@@ -560,7 +570,10 @@ def run_save_checkpoint(
             we've completed.
         out (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialize the model, optimizer, and iteration to.
     """
-    raise NotImplementedError
+    cs336_basics.train.save_checkpoint(model=model,
+                                       optimizer=optimizer,
+                                       iteration=iteration,
+                                       out=out)
 
 
 def run_load_checkpoint(
@@ -581,7 +594,9 @@ def run_load_checkpoint(
     Returns:
         int: the previously-serialized number of iterations.
     """
-    raise NotImplementedError
+    return cs336_basics.decode.load_checkpoint(src=src,
+                                              model=model,
+                                              optimizer=optimizer)
 
 
 def get_tokenizer(

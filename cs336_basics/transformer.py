@@ -1,5 +1,6 @@
 import torch
 from einops import einsum, rearrange, repeat
+from cs336_basics.nn_utils import softmax
 
 class Linear(torch.nn.Module):
     def __init__(self, in_features: int, out_features: int, device=None, dtype=None):
@@ -116,7 +117,7 @@ class SwiGLU(torch.nn.Module):
     
     
 class RotaryPositionalEmbedding(torch.nn.Module):
-    def __init__(self, theta: float, d_k: int, max_seq_len: int, device=None):
+    def __init__(self, theta: float, d_k: int, max_seq_len: int, device=None, dtype=None):
         '''
         Construct the RoPE module and create buffers if needed.
         
@@ -128,8 +129,8 @@ class RotaryPositionalEmbedding(torch.nn.Module):
             dtype: torch.dtype | None = None Data type of the parameters
         '''
         super().__init__()
-        theta_vec = 1.0 / (theta) ** (torch.arange(0, d_k, 2)/d_k)
-        pos = torch.arange(0, max_seq_len, 1)
+        theta_vec = 1.0 / (theta) ** (torch.arange(0, d_k, 2, device=device, dtype=dtype)/d_k)
+        pos = torch.arange(0, max_seq_len, 1, device=device, dtype=dtype)
         freqs = torch.outer(pos, theta_vec)
         self.register_buffer('cos', freqs.cos(), persistent=False)
         self.register_buffer('sin', freqs.sin(), persistent=False)
@@ -148,15 +149,6 @@ class RotaryPositionalEmbedding(torch.nn.Module):
         rotated_x = rearrange([-stacked_x[..., 1], stacked_x[..., 0]], 'n ... d -> ... (d n)', n=2)
         # x1*cos-x2*sin, x2*cos+x1*sin, ...
         return x * cos + rotated_x * sin
-
-
-def softmax(x: torch.Tensor, dim: int=-1) -> torch.Tensor:
-    """
-    Apply the softmax operation on a tensor
-    """
-    max_val = x.max(dim=dim, keepdim=True).values
-    x = x - max_val
-    return x.exp() / x.exp().sum(dim=dim, keepdim=True)
 
 
 def scale_dot_product_attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, mask: torch.Tensor=None):
@@ -191,7 +183,7 @@ class CausalMultiHeadedSelfAttention(torch.nn.Module):
         torch.nn.init.trunc_normal_(self.w_k, 0, std, -3 * std, 3 * std)
         torch.nn.init.trunc_normal_(self.w_q, 0, std, -3 * std, 3 * std)
         torch.nn.init.trunc_normal_(self.w_o, 0, std, -3 * std, 3 * std)
-        self.rope = RotaryPositionalEmbedding(theta, d_model/num_heads, max_seq_len, device) if max_seq_len > 0 else None
+        self.rope = RotaryPositionalEmbedding(theta, d_model/num_heads, max_seq_len, device, dtype) if max_seq_len > 0 else None
         
     def forward(self, x: torch.Tensor, token_positions: torch.Tensor=None) -> torch.Tensor:
         """
@@ -282,12 +274,14 @@ class Transformer(torch.nn.Module):
                                    embedding_dim=d_model,
                                    device=device,
                                    dtype=dtype)
-        self.attn_layers = [TransformerBlock(d_model=d_model,
+        self.attn_layers = torch.nn.ModuleList([TransformerBlock(d_model=d_model,
                                               num_heads=num_heads,
                                               d_ff=d_ff,
                                               theta=rope_theta,
-                                              max_seq_len=context_length) 
-                             for i in range(num_layers)]
+                                              max_seq_len=context_length,
+                                              device=device,
+                                              dtype=dtype)
+                             for i in range(num_layers)])
         self.ln = RMSNorm(d_model=d_model,
                           device=device,
                           dtype=dtype)

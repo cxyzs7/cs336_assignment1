@@ -125,6 +125,8 @@ def train_bpe(
 
         # Merge until meeting vocab size
         for i in range(vocab_size - len(special_tokens) - 256):
+            if not pair_counts:
+                break
             # Find most frequent, use lexicographically order to break tie
             best_pair = max(pair_counts, key=lambda p: (pair_counts[p], p))
             merges.append(best_pair)

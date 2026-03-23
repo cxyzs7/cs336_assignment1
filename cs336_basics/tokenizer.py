@@ -1,5 +1,3 @@
-
-
 from collections.abc import Iterable
 import json
 import regex as re
