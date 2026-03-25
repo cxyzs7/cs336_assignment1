@@ -104,6 +104,7 @@ def main():
     print('Tokenizer trained')
     
     # get dataset
+    # TODO: Memory-efficient loading of training and validation large datasets with np.memmap.
     print('Loading dataset')
     with open(input_path) as f:
         texts = f.read()
@@ -142,6 +143,7 @@ def main():
     )
 
     # train
+    # TODO: learning schedule, gradient clipping
     for it in range(num_steps):
         x, y = get_batch(dataset=dataset,
                          batch_size=batch_size,
@@ -154,6 +156,7 @@ def main():
         opt.step()
         print(f'step:{(it+1)} loss:{loss.item():.4f}')
         # save every 500 steps
+        # TODO: more detailed logging
         if (it+1) % 500 == 0:
             chkp_output_path = Path(output_dir, f'{dataset_name}_chkp_{(it+1)}')
             save_checkpoint(transformer, opt, it, chkp_output_path)

@@ -74,9 +74,9 @@ class RMSNorm(torch.nn.Module):
         # upcast to float32 to prevent overflow
         x = x.to(torch.float32)
         # Perform RMSNorm
-        rms = (einsum(x, x, 'b s d, b s d -> b s')/self.weights.shape[0]+self.eps) ** 0.5
+        rms = torch.rsqrt(einsum(x, x, 'b s d, b s d -> b s')/self.weights.shape[0]+self.eps)
         rms = rearrange(rms, 'b s -> b s 1')
-        result = x/rms * self.weights
+        result = x * rms * self.weights
         return result.to(in_dtype)
     
 
@@ -152,7 +152,7 @@ class RotaryPositionalEmbedding(torch.nn.Module):
 
 
 def scale_dot_product_attention(q: torch.Tensor, k: torch.Tensor, v: torch.Tensor, mask: torch.Tensor=None):
-    qk = einsum(q, k, 'b ... n d_k, b ... m d_k -> b ... n m') / q.shape[-1] ** 0.5
+    qk = einsum(q, k, '... n d_k, ... m d_k -> ... n m') / q.shape[-1] ** 0.5
     if mask is not None:
         qk = qk.masked_fill(~mask, float('-inf'))
     qkv = einsum(softmax(qk, -1), v, 'b ... n m, b ... m d_v -> b ... n d_v')
@@ -181,7 +181,7 @@ class CausalMultiHeadedSelfAttention(torch.nn.Module):
         std = (1 / d_model) ** 0.5
         torch.nn.init.trunc_normal_(self.w_q, 0, std, -3 * std, 3 * std)
         torch.nn.init.trunc_normal_(self.w_k, 0, std, -3 * std, 3 * std)
-        torch.nn.init.trunc_normal_(self.w_q, 0, std, -3 * std, 3 * std)
+        torch.nn.init.trunc_normal_(self.w_v, 0, std, -3 * std, 3 * std)
         torch.nn.init.trunc_normal_(self.w_o, 0, std, -3 * std, 3 * std)
         self.rope = RotaryPositionalEmbedding(theta, d_model/num_heads, max_seq_len, device, dtype) if max_seq_len > 0 else None
         
